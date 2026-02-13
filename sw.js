@@ -1,5 +1,5 @@
 // sw.js
-const CACHE = "millas-heart-vault-v5";
+const CACHE = "millas-heart-vault-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,5 +29,6 @@ self.addEventListener("fetch", (event) => {
     caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
 });
+
 
 
