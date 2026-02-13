@@ -137,15 +137,25 @@ function prevDayKey(dayKey) {
 }
 
 function calcStreak(entries) {
-  const keys = new Set(entries.map(e => e.dayKey));
+  if (!entries || entries.length === 0) return 0;
+
+  // Unique day keys (YYYY-MM-DD)
+  const keySet = new Set(entries.map(e => e.dayKey));
+  const keys = Array.from(keySet);
+
+  // Latest dayKey (lexicographic works for YYYY-MM-DD)
+  keys.sort((a, b) => b.localeCompare(a));
+  let cursor = keys[0];
+
   let streak = 0;
-  let cursor = todayKey();
-  while (keys.has(cursor)) {
+  while (keySet.has(cursor)) {
     streak++;
     cursor = prevDayKey(cursor);
   }
+
   return streak;
 }
+
 
 // ---------- 24h cooldown helpers ----------
 
@@ -389,3 +399,4 @@ function escapeHTML(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
