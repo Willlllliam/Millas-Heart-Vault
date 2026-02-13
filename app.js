@@ -139,22 +139,26 @@ function prevDayKey(dayKey) {
 function calcStreak(entries) {
   if (!entries || entries.length === 0) return 0;
 
-  // Unique day keys (YYYY-MM-DD)
   const keySet = new Set(entries.map(e => e.dayKey));
-  const keys = Array.from(keySet);
+  const keys = Array.from(keySet).sort((a, b) => b.localeCompare(a)); // newest first
+  const newest = keys[0];
 
-  // Latest dayKey (lexicographic works for YYYY-MM-DD)
-  keys.sort((a, b) => b.localeCompare(a));
-  let cursor = keys[0];
+  const t = todayKey();
+  const y = prevDayKey(t);
 
+  // If she missed a day (newest is before yesterday), streak breaks
+  if (newest !== t && newest !== y) return 0;
+
+  // Count backwards from newest saved day
   let streak = 0;
+  let cursor = newest;
   while (keySet.has(cursor)) {
     streak++;
     cursor = prevDayKey(cursor);
   }
-
   return streak;
 }
+
 
 
 // ---------- 24h cooldown helpers ----------
@@ -399,4 +403,5 @@ function escapeHTML(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
 
