@@ -445,8 +445,11 @@ function renderTimeline(entries) {
 }
 
 function entryCardHTML(e) {
-  const date = prettyDateFromDayKey(e.dayKey);
-  const imgUrl = URL.createObjectURL(e.photoBlob);
+  const img = card.querySelector("img");
+  const url = URL.createObjectURL(e.photoBlob);
+  img.src = url;
+  img.onload = () => URL.revokeObjectURL(url);
+  img.onerror = () => URL.revokeObjectURL(url);
   return `
     <div class="entryCard">
       <div class="entryTop">
@@ -464,3 +467,4 @@ function escapeHTML(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
