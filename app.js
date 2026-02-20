@@ -367,9 +367,14 @@ async function onSaveMemory() {
 
     await refreshHome(); // update streak/timeline/button immediately
   } catch (e) {
-    el.createError.textContent = "Could not save. (Storage blocked?)";
-    return;
-  }
+  console.error("SAVE_FAILED", e);
+
+  const name = e?.name || "Error";
+  const msg = e?.message || String(e);
+
+  el.createError.textContent = `Could not save: ${name}${msg ? " — " + msg : ""}`;
+  return;
+}
 
   state.pendingSavedEntry = { ...entry, prettyDate: prettyDateFromDayKey(entry.dayKey) };
   await renderMemoryCard(el.cardCanvas, state.pendingSavedEntry);
@@ -467,5 +472,6 @@ function escapeHTML(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
 
 
