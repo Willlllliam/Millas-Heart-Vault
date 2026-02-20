@@ -76,3 +76,18 @@ export async function setMeta(key, value) {
     req.onerror = () => reject(req.error);
   });
 }
+
+export async function getMetaAll() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("meta", "readonly");
+    const store = tx.objectStore("meta");
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const out = {};
+      for (const row of req.result) out[row.key] = row.value;
+      resolve(out);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
