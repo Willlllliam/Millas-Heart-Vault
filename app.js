@@ -379,20 +379,28 @@ function renderTimeline(entries) {
 
     const wrap = document.createElement("div");
     wrap.innerHTML = entryCardHTML(e);
-    el.timeline.appendChild(wrap.firstElementChild);
+
+    const cardEl = wrap.firstElementChild;
+    el.timeline.appendChild(cardEl);
+
+    // ✅ after appending: set image src + revoke URL to avoid memory leaks
+    const imgEl = cardEl.querySelector(".entryImg");
+    const url = URL.createObjectURL(e.photoBlob);
+    imgEl.src = url;
+    imgEl.onload = () => URL.revokeObjectURL(url);
+    imgEl.onerror = () => URL.revokeObjectURL(url);
   }
 }
 
 function entryCardHTML(e) {
   const date = prettyDateFromDayKey(e.dayKey);
-  const imgUrl = URL.createObjectURL(e.photoBlob);
   return `
     <div class="entryCard">
       <div class="entryTop">
         <div class="entryDate">${date}</div>
         <div class="entryMood">${e.moodEmoji} ${e.mood}</div>
       </div>
-      <img class="entryImg" src="${imgUrl}" alt="Memory photo" />
+      <img class="entryImg" alt="Memory photo" />
       <div class="entryText">${escapeHTML(e.reflection)}</div>
     </div>
   `;

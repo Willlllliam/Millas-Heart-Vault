@@ -111,7 +111,7 @@ export async function renderMemoryCard(canvas, entry) {
   // reflection
   ctx.fillStyle = "#2f1f25";
   ctx.font = "600 38px system-ui, -apple-system, Segoe UI, Roboto";
-  wrapText(ctx, entry.reflection, 70, 1030, W - 140, 52, 5);
+  wrapText(ctx, entry.reflection, 70, 1030, W - 140, 52, 8);
 
   // footer
   ctx.fillStyle = "#6d5962";
