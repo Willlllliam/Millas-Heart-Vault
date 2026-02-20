@@ -72,6 +72,16 @@
         <label class="label">Category <span class="subtle">(optional)</span></label>
         <input class="input" id="categoryInput" type="text" placeholder="e.g., Date night, Laugh, Milestone" />
 
+        <div id="cropWrap" class="hidden">
+  <canvas id="cropCanvas" width="900" height="900"></canvas>
+
+  <div class="row">
+    <input id="zoom" type="range" min="1" max="4" step="0.01" value="1">
+    <button id="cropConfirm">Use Crop</button>
+    <button id="cropCancel" type="button">Cancel</button>
+  </div>
+</div>
+        
         <div class="row">
           <button class="btn ghost" id="btnCancelCreate">Cancel</button>
           <button class="btn primary" id="btnSaveMemory">Save memory</button>
@@ -102,5 +112,6 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
+
 
 
