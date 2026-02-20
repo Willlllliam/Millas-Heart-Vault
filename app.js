@@ -44,7 +44,6 @@ const el = {
   btnBackKeep: document.getElementById("btnBackKeep"),
   cardCanvas: document.getElementById("cardCanvas"),
   btnShareCard: document.getElementById("btnShareCard"),
-  btnConfirmKeep: document.getElementById("btnConfirmKeep"),
   btnDoneKeep: document.getElementById("btnDoneKeep")
 };
 
@@ -86,8 +85,9 @@ async function init() {
 }
 
 function wireEvents() {
-  el.btnBackKeep.addEventListener("click", () => showView("create"));
-  el.btnConfirmKeep.addEventListener("click", onConfirmKeep);
+  el.btnBackKeep.addEventListener("click", () => {
+  showView("create");
+  });
   // Single CTA: always go to Create screen
   el.btnChooseMoment.addEventListener("click", async () => {
     // If cooldown active, do nothing (button is disabled anyway, but belt + suspenders)
@@ -258,8 +258,6 @@ function renderMoodGrid() {
 // ---------- Save flow with enforcement ----------
 
 async function onSaveMemory() {
-
-  
   el.createError.textContent = "";
 
   // 24h cooldown enforcement (regardless of date chosen)
@@ -292,51 +290,34 @@ async function onSaveMemory() {
   // Store photo as Blob in IndexedDB (permanent inside app storage)
   const photoBlob = file.slice(0, file.size, file.type);
 
-  state.pendingSavedEntry = {
-  dayKey: chosenDayKey,
-  momentDateISO: new Date().toISOString(),
-  mood: state.selectedMood.key,
-  moodEmoji: state.selectedMood.emoji,
-  reflection,
-  category,
-  createdAtISO: new Date().toISOString(),
-  photoBlob,
-  prettyDate: prettyDateFromDayKey(chosenDayKey)
-};
-
-await renderMemoryCard(el.cardCanvas, state.pendingSavedEntry);
-showView("keep");
-}
-
-async function onConfirmKeep() {
-  if (!state.pendingSavedEntry) return;
-
-  // cooldown enforcement happens here (final commit moment)
-  if (isCooldownActive()) {
-    const left = msUntilNextSave();
-    alert(`You can save again in ${formatCountdown(left)}. (One memory per 24 hours.)`);
-    return;
-  }
-
-  // one-per-day enforcement
-  const existing = await getEntry(state.pendingSavedEntry.dayKey);
-  if (existing) {
-    alert("A memory already exists for that day.");
-    return;
-  }
+  const entry = {
+    dayKey: chosenDayKey,
+    momentDateISO: new Date().toISOString(),
+    mood: state.selectedMood.key,
+    moodEmoji: state.selectedMood.emoji,
+    reflection,
+    category,
+    createdAtISO: new Date().toISOString(),
+    photoBlob
+  };
 
   try {
-    await putEntry(state.pendingSavedEntry);
+    await putEntry(entry);
 
+    // set last save timestamp for 24h cooldown
     state.lastSaveAtMs = Date.now();
     await setMeta(META_LAST_SAVE_AT, state.lastSaveAtMs);
 
-    await refreshHome(); // updates streak/timeline immediately
-    // stay on keep screen so she can still share
+    await refreshHome(); // update streak/timeline/button immediately
   } catch (e) {
-    console.error("CONFIRM_SAVE_FAILED", e);
-    alert(`Could not save: ${e?.name || "Error"}`);
+    el.createError.textContent = "Could not save. (Storage blocked?)";
+    return;
   }
+
+  state.pendingSavedEntry = { ...entry, prettyDate: prettyDateFromDayKey(entry.dayKey) };
+  await renderMemoryCard(el.cardCanvas, state.pendingSavedEntry);
+
+  showView("keep");
 }
 
 // ---------- Save/share card (Photos-friendly fallback) ----------
