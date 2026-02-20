@@ -8,7 +8,7 @@ const META_APP_VERSION = "appVersion";
 const META_FREE_PASSES = "freePassesRemaining";
 
 // Bump this whenever you deploy changes that may reset/wipe progress.
-const APP_VERSION = "2026-02-20.1";
+const APP_VERSION = "2026-02-20.2";
 const FREE_PASSES_ON_UPDATE = 7;
 
 const MOODS = [
@@ -472,6 +472,7 @@ function escapeHTML(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
+
 
 
 
