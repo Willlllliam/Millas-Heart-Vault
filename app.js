@@ -4,12 +4,6 @@ import { renderMemoryCard, canvasToPngBlob } from "./card.js";
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 const META_LAST_SAVE_AT = "lastSaveAtMs";
-const META_APP_VERSION = "appVersion";
-const META_FREE_PASSES = "freePassesRemaining";
-
-// Bump this whenever you deploy changes that may reset/wipe progress.
-const APP_VERSION = "2026-02-20.2";
-const FREE_PASSES_ON_UPDATE = 7;
 
 const MOODS = [
   { key: "Loved", emoji: "💗" },
@@ -57,8 +51,7 @@ let state = {
   selectedMood: MOODS[0],
   pendingSavedEntry: null,
   cooldownTimer: null,
-  lastSaveAtMs: null,
-  freePassesRemaining: 0
+  lastSaveAtMs: null
 };
 
 init();
@@ -71,11 +64,8 @@ async function init() {
   wireEvents();
   renderMoodGrid();
 
-  await ensureFreePassesOnUpdate();
-
   // Load cooldown state
   state.lastSaveAtMs = await getMeta(META_LAST_SAVE_AT);
-  state.freePassesRemaining = Number(await getMeta(META_FREE_PASSES)) || 0;
 
   // Default date picker to today
   el.dateInput.value = todayKey();
@@ -96,8 +86,8 @@ async function init() {
 function wireEvents() {
   // Single CTA: always go to Create screen
   el.btnChooseMoment.addEventListener("click", async () => {
-    // If cooldown active and no free passes, do nothing (button is disabled anyway, but belt + suspenders)
-    if (isCooldownBlocked()) return;
+    // If cooldown active, do nothing (button is disabled anyway, but belt + suspenders)
+    if (isCooldownActive()) return;
 
     // Open create for today by default, but user can pick any date in calendar input
     openCreateForDay(todayKey());
@@ -169,42 +159,7 @@ function calcStreak(entries) {
   return streak;
 }
 
-// ---------- update + free-pass helpers ----------
 
-async function ensureFreePassesOnUpdate() {
-  const storedVersion = await getMeta(META_APP_VERSION);
-  const free = await getMeta(META_FREE_PASSES);
-
-  if (!storedVersion) {
-    await setMeta(META_APP_VERSION, APP_VERSION);
-    if (free == null) await setMeta(META_FREE_PASSES, FREE_PASSES_ON_UPDATE);
-    state.freePassesRemaining = Number(await getMeta(META_FREE_PASSES)) || FREE_PASSES_ON_UPDATE;
-    return;
-  }
-
-  if (storedVersion !== APP_VERSION) {
-    await setMeta(META_APP_VERSION, APP_VERSION);
-    await setMeta(META_FREE_PASSES, FREE_PASSES_ON_UPDATE);
-    state.freePassesRemaining = FREE_PASSES_ON_UPDATE;
-    return;
-  }
-
-  if (free == null) {
-    await setMeta(META_FREE_PASSES, FREE_PASSES_ON_UPDATE);
-    state.freePassesRemaining = FREE_PASSES_ON_UPDATE;
-  }
-}
-
-function isCooldownBlocked(nowMs = Date.now()) {
-  return isCooldownActive(nowMs) && (state.freePassesRemaining <= 0);
-}
-
-async function consumeFreePassIfNeeded() {
-  if (!isCooldownActive() || state.freePassesRemaining <= 0) return false;
-  state.freePassesRemaining = Math.max(0, state.freePassesRemaining - 1);
-  await setMeta(META_FREE_PASSES, state.freePassesRemaining);
-  return true;
-}
 
 // ---------- 24h cooldown helpers ----------
 
@@ -240,31 +195,18 @@ function startCooldownTicker() {
 }
 
 function updateCooldownUI() {
-  const cooldownActive = isCooldownActive();
-  const blocked = isCooldownBlocked();
+  const active = isCooldownActive();
+  el.btnChooseMoment.disabled = active;
+  el.btnChooseMoment.style.opacity = active ? "0.6" : "1.0";
 
-  el.btnChooseMoment.disabled = blocked;
-  el.btnChooseMoment.style.opacity = blocked ? "0.6" : "1.0";
-
-  if (blocked) {
+  if (active) {
     const left = msUntilNextSave();
     el.homeHint.innerHTML = `<div class="cooldownTimer">${formatCountdown(left)}</div>`;
-    return;
+  } else {
+    el.homeHint.textContent = "One memory per 24 hours. Permanent once saved.";
   }
-
-  if (cooldownActive && state.freePassesRemaining > 0) {
-    const left = msUntilNextSave();
-    el.homeHint.innerHTML = `
-      <div style="text-align:center;">
-        <div class="subtle">${state.freePassesRemaining} free save${state.freePassesRemaining === 1 ? "" : "s"} left</div>
-        <div class="subtle" style="margin-top:6px;">Next normal save in ${formatCountdown(left)}</div>
-      </div>
-    `;
-    return;
-  }
-
-  el.homeHint.textContent = "One memory per 24 hours. Permanent once saved.";
 }
+
 
 // ---------- Main UI refresh ----------
 
@@ -315,14 +257,11 @@ async function onSaveMemory() {
   el.createError.textContent = "";
 
   // 24h cooldown enforcement (regardless of date chosen)
-  if (isCooldownBlocked()) {
+  if (isCooldownActive()) {
     const left = msUntilNextSave();
     el.createError.textContent = `You can save again in ${formatCountdown(left)}. (One memory per 24 hours.)`;
     return;
   }
-
-  // If cooldown is active but she has free passes, consume one now
-  await consumeFreePassIfNeeded();
 
   const file = el.photoInput.files?.[0];
   if (!file) return (el.createError.textContent = "Please choose a photo.");
@@ -367,14 +306,9 @@ async function onSaveMemory() {
 
     await refreshHome(); // update streak/timeline/button immediately
   } catch (e) {
-  console.error("SAVE_FAILED", e);
-
-  const name = e?.name || "Error";
-  const msg = e?.message || String(e);
-
-  el.createError.textContent = `Could not save: ${name}${msg ? " — " + msg : ""}`;
-  return;
-}
+    el.createError.textContent = "Could not save. (Storage blocked?)";
+    return;
+  }
 
   state.pendingSavedEntry = { ...entry, prettyDate: prettyDateFromDayKey(entry.dayKey) };
   await renderMemoryCard(el.cardCanvas, state.pendingSavedEntry);
@@ -450,11 +384,8 @@ function renderTimeline(entries) {
 }
 
 function entryCardHTML(e) {
-  const img = card.querySelector("img");
-  const url = URL.createObjectURL(e.photoBlob);
-  img.src = url;
-  img.onload = () => URL.revokeObjectURL(url);
-  img.onerror = () => URL.revokeObjectURL(url);
+  const date = prettyDateFromDayKey(e.dayKey);
+  const imgUrl = URL.createObjectURL(e.photoBlob);
   return `
     <div class="entryCard">
       <div class="entryTop">
@@ -468,11 +399,9 @@ function entryCardHTML(e) {
 }
 
 function escapeHTML(s) {
-  return s.replace(/[&<>"\']/g, (c) => ({
+  return s.replace(/[&<>"']/g, (c) => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
-
-
 
 

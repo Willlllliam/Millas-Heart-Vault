@@ -8,17 +8,14 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png">
 
-
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 
 <body>
   <header class="topbar">
     <div class="topbar__title">Milla’s Heart Vault</div>
   </header>
-
 
   <main class="container">
     <!-- HOME -->
@@ -27,23 +24,18 @@
         <div class="headline">Choose one moment worth keeping forever.</div>
         <div class="subtle" id="streakLine">🔥 Streak: 0 days</div>
 
-
         <div class="spacer"></div>
-
 
         <button class="btn primary" id="btnChooseMoment">Choose a moment worth keeping forever</button>
         <div class="hint" id="homeHint">One per day. Permanent once saved.</div>
       </div>
 
-
       <div class="row">
         <div class="sectionTitle">Timeline</div>
       </div>
 
-
       <div id="timeline" class="timeline"></div>
     </section>
-
 
     <!-- CREATE -->
     <section class="view hidden" id="view-create" data-view>
@@ -52,55 +44,42 @@
         <div class="subtle" id="createForDateLine"></div>
       </div>
 
-
       <div class="card">
         <label class="label">Photo</label>
         <input class="input" id="photoInput" type="file" accept="image/*" />
 
-
         <div class="spacer"></div>
-
 
         <label class="label">Date</label>
         <input class="input" id="dateInput" type="date" />
 
-
         <div class="spacer"></div>
-
 
         <label class="label">Reflection <span class="subtle">(max 280)</span></label>
         <textarea class="textarea" id="reflectionInput" maxlength="280" placeholder="Why does this moment matter?"></textarea>
-
 
         <div class="prompts subtle">
           Prompts: “What made today special?” · “How did you feel here?”
         </div>
 
-
         <div class="spacer"></div>
-
 
         <label class="label">Mood</label>
         <div id="moodGrid" class="moodGrid"></div>
 
-
         <div class="spacer"></div>
-
 
         <label class="label">Category <span class="subtle">(optional)</span></label>
         <input class="input" id="categoryInput" type="text" placeholder="e.g., Date night, Laugh, Milestone" />
-
 
         <div class="row">
           <button class="btn ghost" id="btnCancelCreate">Cancel</button>
           <button class="btn primary" id="btnSaveMemory">Save memory</button>
         </div>
 
-
         <div class="error" id="createError"></div>
       </div>
     </section>
-
 
     <!-- KEEP FOREVER -->
     <section class="view hidden" id="view-keep" data-view>
@@ -108,7 +87,6 @@
         <div class="sectionTitle">Keep it forever?</div>
         <div class="subtle">Save a keepsake card to Photos or Files.</div>
       </div>
-
 
       <div class="card" id="keepPreviewCard">
         <canvas id="cardCanvas" width="1080" height="1350" class="cardCanvas"></canvas>
@@ -121,7 +99,8 @@
     </section>
   </main>
 
-
   <script type="module" src="app.js"></script>
 </body>
 </html>
+
+

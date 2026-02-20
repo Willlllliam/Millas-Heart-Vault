@@ -4,37 +4,30 @@ const DB_VERSION = 2; // bump version to add meta store
 const STORE_ENTRIES = "entries"; // key = dayKey (YYYY-MM-DD)
 const STORE_META = "meta";       // key = string, value = any
 
-
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
-
     req.onupgradeneeded = () => {
       const db = req.result;
-
 
       if (!db.objectStoreNames.contains(STORE_ENTRIES)) {
         db.createObjectStore(STORE_ENTRIES, { keyPath: "dayKey" });
       }
-
 
       if (!db.objectStoreNames.contains(STORE_META)) {
         db.createObjectStore(STORE_META, { keyPath: "key" });
       }
     };
 
-
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-
 function store(db, name, mode = "readonly") {
   return db.transaction(name, mode).objectStore(name);
 }
-
 
 export async function getEntry(dayKey) {
   const db = await openDB();
@@ -44,7 +37,6 @@ export async function getEntry(dayKey) {
     req.onerror = () => reject(req.error);
   });
 }
-
 
 export async function putEntry(entry) {
   const db = await openDB();
@@ -56,7 +48,6 @@ export async function putEntry(entry) {
   });
 }
 
-
 export async function getAllEntries() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -66,9 +57,7 @@ export async function getAllEntries() {
   });
 }
 
-
 // --- Meta (cooldown etc) ---
-
 
 export async function getMeta(key) {
   const db = await openDB();
@@ -78,7 +67,6 @@ export async function getMeta(key) {
     req.onerror = () => reject(req.error);
   });
 }
-
 
 export async function setMeta(key, value) {
   const db = await openDB();

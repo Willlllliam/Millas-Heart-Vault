@@ -10,12 +10,10 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   const words = text.split(/\s+/);
   let line = "";
   let lines = 0;
-
 
   for (let n = 0; n < words.length; n++) {
     const test = line ? line + " " + words[n] : words[n];
@@ -32,7 +30,6 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   if (lines < maxLines) ctx.fillText(line, x, y);
 }
 
-
 async function blobToImage(blob) {
   const url = URL.createObjectURL(blob);
   try {
@@ -46,28 +43,23 @@ async function blobToImage(blob) {
   }
 }
 
-
 export async function renderMemoryCard(canvas, entry) {
   const ctx = canvas.getContext("2d");
   const W = canvas.width;
   const H = canvas.height;
 
-
   // background
   ctx.fillStyle = "#FFF3F6";
   ctx.fillRect(0, 0, W, H);
-
 
   // header
   ctx.fillStyle = "#2f1f25";
   ctx.font = "700 54px system-ui, -apple-system, Segoe UI, Roboto";
   ctx.fillText("Milla’s Heart Vault", 70, 110);
 
-
   ctx.fillStyle = "#6d5962";
   ctx.font = "500 32px system-ui, -apple-system, Segoe UI, Roboto";
   ctx.fillText(entry.prettyDate, 70, 160);
-
 
   // photo container
   const img = await blobToImage(entry.photoBlob);
@@ -75,7 +67,6 @@ export async function renderMemoryCard(canvas, entry) {
     photoY = 210,
     photoW = W - 140,
     photoH = 650;
-
 
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.10)";
@@ -86,12 +77,10 @@ export async function renderMemoryCard(canvas, entry) {
   ctx.fill();
   ctx.restore();
 
-
   // clip and draw photo (cover crop)
   ctx.save();
   roundRect(ctx, photoX, photoY, photoW, photoH, 40);
   ctx.clip();
-
 
   const scale = Math.max(photoW / img.width, photoH / img.height);
   const dw = img.width * scale;
@@ -100,7 +89,6 @@ export async function renderMemoryCard(canvas, entry) {
   const dy = photoY + (photoH - dh) / 2;
   ctx.drawImage(img, dx, dy, dw, dh);
   ctx.restore();
-
 
   // mood pill
   const pillText = `${entry.moodEmoji}  ${entry.mood}`;
@@ -113,21 +101,17 @@ export async function renderMemoryCard(canvas, entry) {
   const pillX = 70;
   const pillY = 900;
 
-
   ctx.fillStyle = "rgba(240,106,143,0.14)";
   roundRect(ctx, pillX, pillY, pillW, pillH, 999);
   ctx.fill();
 
-
   ctx.fillStyle = "#2f1f25";
   ctx.fillText(pillText, pillX + padX, pillY + 46);
-
 
   // reflection
   ctx.fillStyle = "#2f1f25";
   ctx.font = "600 38px system-ui, -apple-system, Segoe UI, Roboto";
   wrapText(ctx, entry.reflection, 70, 1030, W - 140, 52, 5);
-
 
   // footer
   ctx.fillStyle = "#6d5962";
@@ -135,7 +119,6 @@ export async function renderMemoryCard(canvas, entry) {
   const footer = entry.category ? `Category: ${entry.category}` : "One moment worth keeping forever.";
   ctx.fillText(footer, 70, 1290);
 }
-
 
 export async function canvasToPngBlob(canvas) {
   return new Promise((resolve) => {
