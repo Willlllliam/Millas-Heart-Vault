@@ -1,5 +1,5 @@
 // sw.js
-const CACHE = "millas-heart-vault-v7"; // bump on every deploy
+const CACHE = "millas-heart-vault-v8"; // bump on every deploy
 const ASSETS = [
   "./",
   "./index.html",
