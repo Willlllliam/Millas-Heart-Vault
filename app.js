@@ -128,13 +128,11 @@ function wireEvents() {
   showView("create");
   });
   // Single CTA: always go to Create screen
-  el.btnChooseMoment.addEventListener("click", async () => {
-    // If cooldown active, do nothing (button is disabled anyway, but belt + suspenders)
-    if (isCooldownActive()) return;
-
-    // Open create for today by default, but user can pick any date in calendar input
-    openCreateForDay(todayKey());
-  });
+el.btnChooseMoment.addEventListener("click", () => {
+  // Always allow opening Create so she can pick a backfill date even during cooldown.
+  openCreateForDay(todayKey());
+  updateCooldownUI(); // show cooldown/backfill status immediately
+});
 
   el.btnCancelCreate.addEventListener("click", () => showView("home"));
   el.btnSaveMemory.addEventListener("click", onSaveMemory);
