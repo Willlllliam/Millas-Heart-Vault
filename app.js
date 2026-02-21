@@ -310,7 +310,8 @@ async function onSaveMemory() {
 
     await refreshHome(); // update streak/timeline/button immediately
   } catch (e) {
-    el.createError.textContent = "Could not save. (Storage blocked?)";
+    console.error("SAVE_FAILED", e);
+    el.createError.textContent = `Could not save: ${e?.name || "Error"}${e?.message ? " — " + e.message : ""}`;
     return;
   }
 
