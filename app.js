@@ -66,8 +66,12 @@ async function init() {
   renderMoodGrid();
 
   // Load cooldown state
+try {
   state.lastSaveAtMs = await getMeta(META_LAST_SAVE_AT);
-
+} catch (e) {
+  console.warn("getMeta failed, will fallback to entries", e);
+  state.lastSaveAtMs = null;
+}
   // Default date picker to today
   el.dateInput.value = todayKey();
   el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
@@ -78,6 +82,20 @@ async function init() {
   });
 
   await refreshHome();
+
+  // If meta missing/broken, derive lastSaveAt from entries so cooldown works on every device
+  if (!state.lastSaveAtMs) {
+    const derived = lastSaveAtFromEntries(state.entries);
+    if (derived) state.lastSaveAtMs = derived;
+  }
+
+  if (state.entries.length) {
+  const newest = state.entries[0].dayKey;
+  const t = todayKey();
+  const y = prevDayKey(t);
+  console.log("STREAK_DEBUG", { newest, today: t, yesterday: y, entries: state.entries.length });
+  }
+
   showView("home");
 
   // start live cooldown countdown UI
@@ -140,20 +158,12 @@ function prevDayKey(dayKey) {
   return todayKey(dt);
 }
 
-function calcStreak(entries) {
+function calcChainStreak(entries) {
   if (!entries || entries.length === 0) return 0;
 
   const keySet = new Set(entries.map(e => e.dayKey));
-  const keys = Array.from(keySet).sort((a, b) => b.localeCompare(a)); // newest first
-  const newest = keys[0];
+  const newest = Array.from(keySet).sort((a, b) => b.localeCompare(a))[0];
 
-  const t = todayKey();
-  const y = prevDayKey(t);
-
-  // If she missed a day (newest is before yesterday), streak breaks
-  if (newest !== t && newest !== y) return 0;
-
-  // Count backwards from newest saved day
   let streak = 0;
   let cursor = newest;
   while (keySet.has(cursor)) {
@@ -161,6 +171,19 @@ function calcStreak(entries) {
     cursor = prevDayKey(cursor);
   }
   return streak;
+}
+
+function calcActiveStreak(entries) {
+  if (!entries || entries.length === 0) return 0;
+
+  const keySet = new Set(entries.map(e => e.dayKey));
+  const newest = Array.from(keySet).sort((a, b) => b.localeCompare(a))[0];
+
+  const t = todayKey();
+  const y = prevDayKey(t);
+
+  if (newest !== t && newest !== y) return 0;
+  return calcChainStreak(entries);
 }
 
 
@@ -218,8 +241,19 @@ async function refreshHome() {
   state.entries = await getAllEntries();
   state.entries.sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 
-  const streak = calcStreak(state.entries);
-  el.streakLine.textContent = `🔥 Streak: ${streak} day${streak === 1 ? "" : "s"}`;
+  // ✅ self-heal cooldown if meta missing/broken
+  if (!state.lastSaveAtMs) {
+    const derived = lastSaveAtFromEntries(state.entries);
+    if (derived) state.lastSaveAtMs = derived;
+  }
+
+const active = calcActiveStreak(state.entries);
+const chain = calcChainStreak(state.entries);
+
+el.streakLine.textContent =
+  active > 0
+    ? `🔥 Streak: ${active} day${active === 1 ? "" : "s"}`
+    : `🔥 Streak: 0 days (last run: ${chain} day${chain === 1 ? "" : "s"})`;
 
   updateCooldownUI();
   renderTimeline(state.entries);
@@ -304,11 +338,17 @@ async function onSaveMemory() {
   try {
     await putEntry(entry);
 
-    // set last save timestamp for 24h cooldown
+    // always set in-memory cooldown
     state.lastSaveAtMs = Date.now();
-    await setMeta(META_LAST_SAVE_AT, state.lastSaveAtMs);
 
-    await refreshHome(); // update streak/timeline/button immediately
+    // meta is best-effort only
+    try {
+      await setMeta(META_LAST_SAVE_AT, state.lastSaveAtMs);
+    } catch (e) {
+      console.warn("setMeta failed; using in-memory/fallback cooldown", e);
+    }
+
+    await refreshHome();
   } catch (e) {
     console.error("SAVE_FAILED", e);
     el.createError.textContent = `Could not save: ${e?.name || "Error"}${e?.message ? " — " + e.message : ""}`;
@@ -417,4 +457,23 @@ function escapeHTML(s) {
   }[c]));
 }
 
+function lastSaveAtFromEntries(entries) {
+  let max = null;
 
+  for (const e of (entries || [])) {
+    // Prefer createdAtISO (your newer entries)
+    if (e.createdAtISO) {
+      const t = Date.parse(e.createdAtISO);
+      if (!Number.isNaN(t)) max = max == null ? t : Math.max(max, t);
+      continue;
+    }
+
+    // Fallback: momentDateISO if present
+    if (e.momentDateISO) {
+      const t = Date.parse(e.momentDateISO);
+      if (!Number.isNaN(t)) max = max == null ? t : Math.max(max, t);
+    }
+  }
+
+  return max; // ms or null
+}
