@@ -47,15 +47,16 @@ const el = {
   btnDoneKeep: document.getElementById("btnDoneKeep")
 };
 
+// app.js
+
 let state = {
   entries: [],
   selectedMood: MOODS[0],
   pendingSavedEntry: null,
   cooldownTimer: null,
-  lastSaveAtMs: null
+  lastSaveAtMs: null,
+  lastTodayKey: null
 };
-
-init();
 
 async function init() {
   if ("serviceWorker" in navigator) {
@@ -65,41 +66,37 @@ async function init() {
   wireEvents();
   renderMoodGrid();
 
-  // Load cooldown state
-try {
   state.lastSaveAtMs = await getMeta(META_LAST_SAVE_AT);
-} catch (e) {
-  console.warn("getMeta failed, will fallback to entries", e);
-  state.lastSaveAtMs = null;
-}
-  // Default date picker to today
+
+  state.lastTodayKey = todayKey(); // ✅ track current day
+
   el.dateInput.value = todayKey();
   el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
 
-  // Keep the “For:” line in sync with date picker
   el.dateInput.addEventListener("change", () => {
     el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
   });
 
   await refreshHome();
-
-  // If meta missing/broken, derive lastSaveAt from entries so cooldown works on every device
-  if (!state.lastSaveAtMs) {
-    const derived = lastSaveAtFromEntries(state.entries);
-    if (derived) state.lastSaveAtMs = derived;
-  }
-
-  if (state.entries.length) {
-  const newest = state.entries[0].dayKey;
-  const t = todayKey();
-  const y = prevDayKey(t);
-  console.log("STREAK_DEBUG", { newest, today: t, yesterday: y, entries: state.entries.length });
-  }
-
   showView("home");
 
-  // start live cooldown countdown UI
   startCooldownTicker();
+}
+
+function startCooldownTicker() {
+  if (state.cooldownTimer) clearInterval(state.cooldownTimer);
+  state.cooldownTimer = setInterval(async () => {
+    // ✅ if the calendar day changed while app is open, refresh streak/timeline
+    const tk = todayKey();
+    if (tk !== state.lastTodayKey) {
+      state.lastTodayKey = tk;
+      await refreshHome();
+    } else {
+      updateCooldownUI();
+    }
+  }, 1000);
+
+  updateCooldownUI();
 }
 
 function wireEvents() {
