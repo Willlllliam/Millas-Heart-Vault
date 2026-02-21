@@ -255,18 +255,15 @@ async function updateCooldownUI() {
 
   const canCreate = backfill ? backfillLeft > 0 : canToday;
 
-  el.btnSave.disabled = !canCreate;
+  el.btnSaveMemory.disabled = !canCreate;
 
+  // show status in createError (since you don't have cooldownLine)
   if (backfill) {
-    el.cooldownLine.textContent =
-      backfillLeft > 0
-        ? `⏳ Backfill credits left: ${backfillLeft}`
-        : `⏳ No backfill credits left`;
+    el.createError.textContent =
+      backfillLeft > 0 ? `Backfill credits left: ${backfillLeft}` : `No backfill credits left.`;
   } else {
-    el.cooldownLine.textContent =
-      canToday
-        ? `✅ You can save now`
-        : `⏳ Next save in ${msToHhMmSs(cooldownLeft)}`;
+    el.createError.textContent =
+      canToday ? "" : `You can save again in ${formatCountdown(cooldownLeft)}. (One memory per 24 hours.)`;
   }
 }
 
@@ -330,13 +327,6 @@ function renderMoodGrid() {
 async function onSaveMemory() {
   el.createError.textContent = "";
 
-  // 24h cooldown enforcement (regardless of date chosen)
-  if (isCooldownActive()) {
-    const left = msUntilNextSave();
-    el.createError.textContent = `You can save again in ${formatCountdown(left)}. (One memory per 24 hours.)`;
-    return;
-  }
-
   const file = el.photoInput.files?.[0];
   if (!file) return (el.createError.textContent = "Please choose a photo.");
 
@@ -348,7 +338,25 @@ async function onSaveMemory() {
     return (el.createError.textContent = "Invalid date.");
   }
 
-  // one-per-day enforcement (no duplicates for same date)
+  const backfill = isBackfillDay(chosenDayKey);
+
+  // ✅ cooldown only for "today" saves (non-backfill)
+  if (!backfill && isCooldownActive()) {
+    const left = msUntilNextSave();
+    el.createError.textContent = `You can save again in ${formatCountdown(left)}. (One memory per 24 hours.)`;
+    return;
+  }
+
+  // ✅ backfill credit gate
+  if (backfill) {
+    const used = state.backfillUsed || 0;
+    if (used >= BACKFILL_FREE) {
+      el.createError.textContent = "Backfill limit reached (10).";
+      return;
+    }
+  }
+
+  // one-per-day enforcement
   const existing = await getEntry(chosenDayKey);
   if (existing) {
     el.createError.textContent = "A memory already exists for that day.";
@@ -356,8 +364,6 @@ async function onSaveMemory() {
   }
 
   const category = el.categoryInput.value.trim() || null;
-
-  // Store photo as Blob in IndexedDB (permanent inside app storage)
   const photoBlob = file.slice(0, file.size, file.type);
 
   const entry = {
@@ -374,66 +380,49 @@ async function onSaveMemory() {
   try {
     await putEntry(entry);
 
-    // always set in-memory cooldown
-    state.lastSaveAtMs = Date.now();
+    const now = Date.now();
 
-    // meta is best-effort only
-    try {
-      await setMeta(META_LAST_SAVE_AT, state.lastSaveAtMs);
-    } catch (e) {
-      console.warn("setMeta failed; using in-memory/fallback cooldown", e);
+    if (backfill) {
+      state.backfillUsed = (state.backfillUsed || 0) + 1;
+      try { await setMeta(META_BACKFILL_USED, state.backfillUsed); } catch {}
+      // backfills do NOT touch streak or cooldown
+    } else {
+      // ✅ update streak (24h-based) + cooldown
+      const lastAt = state.streakLastAtMs || 0;
+      const lastDayKey = (await getMeta(META_STREAK_LAST_DAYKEY)) || null;
+
+      if (lastDayKey !== todayKey()) {
+        if (lastAt && now - lastAt > COOLDOWN_MS) {
+          state.lastRunStreak = state.streakCount || 0;
+          try { await setMeta(META_LAST_RUN_STREAK, state.lastRunStreak); } catch {}
+          state.streakCount = 1;
+        } else {
+          state.streakCount = (state.streakCount || 0) + 1;
+        }
+
+        state.bestStreak = Math.max(state.bestStreak || 0, state.streakCount);
+        try {
+          await setMeta(META_BEST_STREAK, state.bestStreak);
+          await setMeta(META_STREAK_COUNT, state.streakCount);
+          await setMeta(META_STREAK_LAST_DAYKEY, todayKey());
+        } catch {}
+      }
+
+      state.streakLastAtMs = now;
+      state.lastSaveAtMs = now;
+
+      try {
+        await setMeta(META_STREAK_LAST_AT, now);
+        await setMeta(META_LAST_SAVE_AT, now);
+      } catch {}
     }
 
     await refreshHome();
+    showView("keep");
   } catch (e) {
     console.error("SAVE_FAILED", e);
     el.createError.textContent = `Could not save: ${e?.name || "Error"}${e?.message ? " — " + e.message : ""}`;
-    return;
   }
-
-  const now = Date.now();
-const dk = entry.dayKey;
-const backfill = isBackfillDay(dk);
-
-await putEntry(entry);
-
-if (backfill) {
-  const used = state.backfillUsed || 0;
-  if (used >= BACKFILL_FREE) {
-    alert("Backfill limit reached (10). Add new memories from today to continue your streak.");
-    return;
-  }
-  state.backfillUsed = used + 1;
-  await setMeta(META_BACKFILL_USED, state.backfillUsed);
-} else {
-  const lastAt = state.streakLastAtMs || 0;
-  const lastDayKey = (await getMeta(META_STREAK_LAST_DAYKEY)) || null;
-
-  if (lastDayKey !== todayKey()) {
-    if (lastAt && now - lastAt > COOLDOWN_MS) {
-      state.lastRunStreak = state.streakCount || 0;
-      await setMeta(META_LAST_RUN_STREAK, state.lastRunStreak);
-      state.streakCount = 1;
-    } else {
-      state.streakCount = (state.streakCount || 0) + 1;
-    }
-
-    state.bestStreak = Math.max(state.bestStreak || 0, state.streakCount);
-    await setMeta(META_BEST_STREAK, state.bestStreak);
-    await setMeta(META_STREAK_COUNT, state.streakCount);
-    await setMeta(META_STREAK_LAST_DAYKEY, todayKey());
-  }
-
-  state.streakLastAtMs = now;
-  await setMeta(META_STREAK_LAST_AT, now);
-
-  state.lastSaveAtMs = now;
-  await setMeta(META_LAST_SAVE_AT, now);
-}
-
-await refreshHome();
-
-  showView("keep");
 }
 
 // ---------- Save/share card (Photos-friendly fallback) ----------
