@@ -55,7 +55,8 @@ let state = {
   pendingSavedEntry: null,
   cooldownTimer: null,
   lastSaveAtMs: null,
-  lastTodayKey: null
+  lastTodayKey: null,
+  refreshingHome: false
 };
 
 async function init() {
@@ -67,7 +68,7 @@ async function init() {
   renderMoodGrid();
 
   state.lastSaveAtMs = await getMeta(META_LAST_SAVE_AT);
-
+  
   state.lastTodayKey = todayKey(); // ✅ track current day
 
   el.dateInput.value = todayKey();

@@ -1,6 +1,6 @@
 // db.js
 const DB_NAME = "millashvault";
-const DB_VERSION = 8; // bump version to add meta store
+const DB_VERSION = 9; // bump version to add meta store
 const STORE_ENTRIES = "entries"; // key = dayKey (YYYY-MM-DD)
 const STORE_META = "meta";       // key = string, value = any
 
