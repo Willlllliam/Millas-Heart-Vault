@@ -4,6 +4,17 @@ import { renderMemoryCard, canvasToPngBlob } from "./card.js";
 
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 const META_LAST_SAVE_AT = "lastSaveAtMs";
+const META_STREAK_COUNT = "streakCount";
+const META_STREAK_LAST_AT = "streakLastAtMs";
+const META_STREAK_LAST_DAYKEY = "streakLastDayKey";
+const META_LAST_RUN_STREAK = "lastRunStreak";
+const META_BEST_STREAK = "bestStreak";
+const META_BACKFILL_USED = "backfillUsed";
+const BACKFILL_FREE = 10;
+
+function isBackfillDay(dayKey) {
+  return dayKey && dayKey < todayKey();
+}
 
 const MOODS = [
   { key: "Loved", emoji: "💗" },
@@ -52,7 +63,12 @@ let state = {
   selectedMood: MOODS[0],
   pendingSavedEntry: null,
   cooldownTimer: null,
-  lastSaveAtMs: null
+  lastSaveAtMs: null,
+  streakCount: 0,
+  streakLastAtMs: 0,
+  lastRunStreak: 0,
+  bestStreak: 0,
+  backfillUsed: 0
 };
 
 init();
@@ -68,6 +84,11 @@ async function init() {
   // Load cooldown state
 try {
   state.lastSaveAtMs = await getMeta(META_LAST_SAVE_AT);
+  state.streakCount = (await getMeta(META_STREAK_COUNT)) || 0;
+  state.streakLastAtMs = (await getMeta(META_STREAK_LAST_AT)) || 0;
+  state.lastRunStreak = (await getMeta(META_LAST_RUN_STREAK)) || 0;
+  state.bestStreak = (await getMeta(META_BEST_STREAK)) || 0;
+  state.backfillUsed = (await getMeta(META_BACKFILL_USED)) || 0;
 } catch (e) {
   console.warn("getMeta failed, will fallback to entries", e);
   state.lastSaveAtMs = null;
@@ -221,16 +242,31 @@ function startCooldownTicker() {
   updateCooldownUI();
 }
 
-function updateCooldownUI() {
-  const active = isCooldownActive();
-  el.btnChooseMoment.disabled = active;
-  el.btnChooseMoment.style.opacity = active ? "0.6" : "1.0";
+async function updateCooldownUI() {
+  const now = Date.now();
+  const last = state.lastSaveAtMs || 0;
 
-  if (active) {
-    const left = msUntilNextSave();
-    el.homeHint.innerHTML = `<div class="cooldownTimer">${formatCountdown(left)}</div>`;
+  const selectedDayKey = el.dateInput.value || todayKey();
+  const backfill = isBackfillDay(selectedDayKey);
+  const backfillLeft = BACKFILL_FREE - (state.backfillUsed || 0);
+
+  const cooldownLeft = Math.max(0, COOLDOWN_MS - (now - last));
+  const canToday = cooldownLeft === 0;
+
+  const canCreate = backfill ? backfillLeft > 0 : canToday;
+
+  el.btnSave.disabled = !canCreate;
+
+  if (backfill) {
+    el.cooldownLine.textContent =
+      backfillLeft > 0
+        ? `⏳ Backfill credits left: ${backfillLeft}`
+        : `⏳ No backfill credits left`;
   } else {
-    el.homeHint.textContent = "One memory per 24 hours. Permanent once saved.";
+    el.cooldownLine.textContent =
+      canToday
+        ? `✅ You can save now`
+        : `⏳ Next save in ${msToHhMmSs(cooldownLeft)}`;
   }
 }
 
@@ -242,19 +278,19 @@ async function refreshHome() {
   state.entries.sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 
   // ✅ self-heal cooldown if meta missing/broken
-  if (!state.lastSaveAtMs) {
-    const derived = lastSaveAtFromEntries(state.entries);
-    if (derived) state.lastSaveAtMs = derived;
-  }
+const now = Date.now();
+const active =
+  state.streakLastAtMs && now - state.streakLastAtMs <= COOLDOWN_MS
+    ? state.streakCount
+    : 0;
 
-const active = calcActiveStreak(state.entries);
-const chain = calcChainStreak(state.entries);
+const lastRun = state.lastRunStreak || 0;
+const best = state.bestStreak || 0;
 
 el.streakLine.textContent =
   active > 0
-    ? `🔥 Streak: ${active} day${active === 1 ? "" : "s"}`
-    : `🔥 Streak: 0 days (last run: ${chain} day${chain === 1 ? "" : "s"})`;
-
+    ? `🔥 Streak: ${active} days (best: ${best})`
+    : `🔥 Streak: 0 days (last run: ${lastRun}, best: ${best})`;  
   updateCooldownUI();
   renderTimeline(state.entries);
 }
@@ -355,8 +391,47 @@ async function onSaveMemory() {
     return;
   }
 
-  state.pendingSavedEntry = { ...entry, prettyDate: prettyDateFromDayKey(entry.dayKey) };
-  await renderMemoryCard(el.cardCanvas, state.pendingSavedEntry);
+  const now = Date.now();
+const dk = entry.dayKey;
+const backfill = isBackfillDay(dk);
+
+await putEntry(entry);
+
+if (backfill) {
+  const used = state.backfillUsed || 0;
+  if (used >= BACKFILL_FREE) {
+    alert("Backfill limit reached (10). Add new memories from today to continue your streak.");
+    return;
+  }
+  state.backfillUsed = used + 1;
+  await setMeta(META_BACKFILL_USED, state.backfillUsed);
+} else {
+  const lastAt = state.streakLastAtMs || 0;
+  const lastDayKey = (await getMeta(META_STREAK_LAST_DAYKEY)) || null;
+
+  if (lastDayKey !== todayKey()) {
+    if (lastAt && now - lastAt > COOLDOWN_MS) {
+      state.lastRunStreak = state.streakCount || 0;
+      await setMeta(META_LAST_RUN_STREAK, state.lastRunStreak);
+      state.streakCount = 1;
+    } else {
+      state.streakCount = (state.streakCount || 0) + 1;
+    }
+
+    state.bestStreak = Math.max(state.bestStreak || 0, state.streakCount);
+    await setMeta(META_BEST_STREAK, state.bestStreak);
+    await setMeta(META_STREAK_COUNT, state.streakCount);
+    await setMeta(META_STREAK_LAST_DAYKEY, todayKey());
+  }
+
+  state.streakLastAtMs = now;
+  await setMeta(META_STREAK_LAST_AT, now);
+
+  state.lastSaveAtMs = now;
+  await setMeta(META_LAST_SAVE_AT, now);
+}
+
+await refreshHome();
 
   showView("keep");
 }
