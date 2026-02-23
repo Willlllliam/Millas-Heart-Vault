@@ -98,9 +98,10 @@ try {
   el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
 
   // Keep the “For:” line in sync with date picker
-  el.dateInput.addEventListener("change", () => {
-    el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
-  });
+el.dateInput.addEventListener("change", () => {
+  el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(el.dateInput.value)}`;
+  updateCooldownUI();
+});
 
   await refreshHome();
 
@@ -302,6 +303,7 @@ function openCreateForDay(dayKey) {
   el.createForDateLine.textContent = `For: ${prettyDateFromDayKey(dayKey)}`;
 
   renderMoodGrid();
+  updateCooldownUI();
   showView("create");
 }
 
