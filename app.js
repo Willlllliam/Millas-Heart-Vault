@@ -41,6 +41,7 @@ const el = {
   createError: document.getElementById("createError"),
 
   // keep
+  btnBackKeep: document.getElementById("btnBackKeep"),
   cardCanvas: document.getElementById("cardCanvas"),
   btnShareCard: document.getElementById("btnShareCard"),
   btnDoneKeep: document.getElementById("btnDoneKeep")
@@ -84,6 +85,9 @@ async function init() {
 }
 
 function wireEvents() {
+  el.btnBackKeep.addEventListener("click", () => {
+  showView("create");
+  });
   // Single CTA: always go to Create screen
   el.btnChooseMoment.addEventListener("click", async () => {
     // If cooldown active, do nothing (button is disabled anyway, but belt + suspenders)

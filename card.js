@@ -117,7 +117,7 @@ export async function renderMemoryCard(canvas, entry) {
   ctx.fillStyle = "#6d5962";
   ctx.font = "500 26px system-ui, -apple-system, Segoe UI, Roboto";
   const footer = entry.category ? `Category: ${entry.category}` : "One moment worth keeping forever.";
-  ctx.fillText(footer, 70, 1290);
+  ctx.fillText(footer, 70, 1340);
 }
 
 export async function canvasToPngBlob(canvas) {
